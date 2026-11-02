@@ -1,0 +1,176 @@
+import { ScrollView } from "std-widgets.slint";
+
+export struct ResultItem {
+    title: string,
+    subtitle: string,
+    kind: string,
+    initial: string,
+}
+
+export component AppWindow inherits Window {
+    title: "Slipway";
+    no-frame: true;
+    always-on-top: true;
+    width: 750px;
+    height: 475px;
+    background: transparent;
+
+    in-out property <string> query;
+    in-out property <[ResultItem]> results;
+    in property <int> selected: 0;
+
+    callback query-changed(string);
+    callback activate(int);
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #1a1a1aff;
+        border-width: 1px;
+        border-color: #ffffff22;
+        border-radius: 8px;
+
+        WindowMoveArea {
+            x: 0px;
+            y: 0px;
+            width: 48px;
+            height: 65px;
+        }
+
+        Image {
+            x: 16px;
+            y: 22px;
+            width: 21px;
+            height: 21px;
+            source: @image-url("assets/Logo-transparent.png");
+        }
+
+        input := TextInput {
+            x: 48px;
+            y: 0px;
+            width: parent.width - 140px;
+            height: 65px;
+            font-size: 17px;
+            color: #f2f5f7;
+            single-line: true;
+            vertical-alignment: center;
+            text <=> root.query;
+
+            edited => {
+                root.query-changed(self.text);
+            }
+        }
+
+        Text {
+            x: 48px;
+            y: 0px;
+            width: parent.width - 140px;
+            height: 65px;
+            text: "Search for apps or commands…";
+            font-size: 19px;
+            color: #ffffff59;
+            vertical-alignment: center;
+            visible: root.query == "";
+        }
+
+        Rectangle {
+            y: 65px;
+            width: 100%;
+            height: 1px;
+            background: #ffffff22;
+        }
+
+        ScrollView {
+            x: 0px;
+            y: 66px;
+            width: parent.width;
+            height: parent.height - 66px - 42px;
+
+            VerticalLayout {
+                padding: 8px;
+                spacing: 2px;
+                alignment: start;
+
+                Rectangle {
+                    height: 22px;
+
+                    Text {
+                        x: 8px;
+                        height: parent.height;
+                        text: root.results.length == 0 ? "Favorites" : "Suggestions";
+                        font-size: 11px;
+                        font-weight: 800;
+                        color: #ffffff66;
+                        vertical-alignment: center;
+                    }
+                }
+
+                for item[i] in root.results: Rectangle {
+                    height: 38px;
+                    border-radius: 6px;
+                    background: root.selected == i ? #ffffff22 : transparent;
+
+                    TouchArea {
+                        clicked => {
+                            root.activate(i);
+                        }
+                    }
+
+                    Text {
+                        x: 10px;
+                        y: 8px;
+                        width: 24px;
+                        height: 24px;
+                        text: item.initial;
+                        font-size: 12px;
+                        font-weight: 700;
+                        color: #ffffff;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    HorizontalLayout {
+                        x: 46px;
+                        width: parent.width - 46px - 150px;
+                        height: parent.height;
+                        spacing: 10px;
+                        alignment: start;
+
+                        Text {
+                            text: item.title;
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #f2f5f7;
+                            vertical-alignment: center;
+                        }
+
+                        Text {
+                            text: item.subtitle;
+                            font-size: 13px;
+                            color: #ffffff73;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Text {
+                        x: parent.width - 150px;
+                        width: 136px;
+                        height: parent.height;
+                        text: item.kind;
+                        font-size: 13px;
+                        color: #ffffff73;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            y: parent.height - 42px;
+            width: 100%;
+            height: 1px;
+            background: #ffffff22;
+        }
+    }
+}

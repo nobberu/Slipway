@@ -1,0 +1,24 @@
+[package]
+name = "Slipway"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+slint = { version = "1.18.1", default-features = false, features = [
+  "std",
+  "compat-1-18",
+  "backend-default",
+  "renderer-femtovg",
+] }
+
+[build-dependencies]
+slint-build = { version = "1.18.1", default-features = false, features = [
+  "compat-1-18",
+] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
