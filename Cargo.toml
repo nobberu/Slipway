@@ -8,8 +8,8 @@ license = "GPL-3.0-or-later"
 slint = { version = "1.18.1", default-features = false, features = [
   "std",
   "compat-1-18",
-  "backend-default",
-  "renderer-software",
+  "backend-winit",
+  "renderer-femtovg",
   "raw-window-handle-06",
 ] }
 window-vibrancy = "0.8.1"
@@ -21,14 +21,11 @@ slint-build = { version = "1.18.1", default-features = false, features = [
 ] }
 
 [profile.dev]
-opt-level = 1
-
-[profile.dev.package."*"]
-opt-level = 2
+opt-level = "s"
 
 [profile.release]
-opt-level = 3
+opt-level = "s"
 lto = "fat"
 codegen-units = 1
 panic = "abort"
-strip = "debuginfo"
+strip = true

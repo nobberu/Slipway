@@ -66,9 +66,22 @@ fn apply_blur(ui: &AppWindow) {
 fn main() -> Result<(), slint::PlatformError> {
     let ui = AppWindow::new()?;
 
-    let results: Vec<ResultItem> = CATALOG
-        .iter()
-        .map(|(title, subtitle, kind)| ResultItem {
+    let mut results: Vec<ResultItem> = Vec::new();
+    let mut current_kind: Option<&str> = None;
+
+    for (title, subtitle, kind) in CATALOG {
+        if current_kind != Some(*kind) {
+            current_kind = Some(*kind);
+            results.push(ResultItem {
+                title: format!("{kind}s").into(),
+                subtitle: "".into(),
+                kind: "".into(),
+                initial: "".into(),
+                is_header: true,
+            });
+        }
+
+        results.push(ResultItem {
             title: (*title).into(),
             subtitle: (*subtitle).into(),
             kind: (*kind).into(),
@@ -79,10 +92,12 @@ fn main() -> Result<(), slint::PlatformError> {
                 .to_uppercase()
                 .to_string()
                 .into(),
-        })
-        .collect();
+            is_header: false,
+        });
+    }
 
     ui.set_results(std::rc::Rc::new(slint::VecModel::from(results)).into());
+    ui.set_selected(1);
 
     let weak = ui.as_weak();
     slint::Timer::single_shot(Duration::from_millis(50), move || {
