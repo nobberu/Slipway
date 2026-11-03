@@ -11,8 +11,10 @@
 </h3>
 
 <br>
-
 <p align="center">
+  <a href="https://github.com/thatshubham/no-ai">
+    <img src="https://img.shields.io/badge/No_AI-Generated_Content-red" alt="No AI Generated Content">
+  </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License GPLv3">
   </a>
