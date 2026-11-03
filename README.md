@@ -1,6 +1,6 @@
 <h1 align="center">
   <br>
-  <a href="https://github.com/nobberu/slipway"><img src="ui/assets/Slipway.png" alt="Slipway" width="150"></a>
+  <a href="https://github.com/nobberu/slipway"><img src="repo-assets/Slipway.png" alt="Slipway" width="150"></a>
   <br>
   Slipway
   <br>
