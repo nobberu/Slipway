@@ -1,3 +1,6 @@
+use std::ffi::c_void;
+use std::time::Duration;
+
 slint::include_modules!();
 
 const CATALOG: &[(&str, &str, &str)] = &[
@@ -10,7 +13,55 @@ const CATALOG: &[(&str, &str, &str)] = &[
     ("Command 2", "System Actions", "Command"),
     ("Command 3", "System Actions", "Command"),
     ("Command 4", "System Actions", "Command"),
+    ("Command 4", "System Actions", "Command"),
+    ("Command 4", "System Actions", "Command"),
+    ("Command 4", "System Actions", "Command"),
 ];
+
+#[cfg(target_os = "windows")]
+#[link(name = "dwmapi")]
+unsafe extern "system" {
+    fn DwmSetWindowAttribute(
+        hwnd: *mut c_void,
+        attribute: u32,
+        value: *const c_void,
+        size: u32,
+    ) -> i32;
+}
+
+#[cfg(target_os = "windows")]
+fn round_corners(ui: &AppWindow) {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use slint::ComponentHandle;
+
+    const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
+    const DWMWCP_ROUND: u32 = 2;
+
+    let handle = ui.window().window_handle();
+
+    if let Ok(wh) = handle.window_handle() {
+        if let RawWindowHandle::Win32(h) = wh.as_raw() {
+            let hwnd = h.hwnd.get() as *mut c_void;
+            let pref = DWMWCP_ROUND;
+            unsafe {
+                DwmSetWindowAttribute(
+                    hwnd,
+                    DWMWA_WINDOW_CORNER_PREFERENCE,
+                    &pref as *const u32 as *const c_void,
+                    std::mem::size_of::<u32>() as u32,
+                );
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn apply_blur(ui: &AppWindow) {
+    use slint::ComponentHandle;
+    round_corners(ui);
+    let handle = ui.window().window_handle();
+    let _ = window_vibrancy::apply_acrylic(&handle, None);
+}
 
 fn main() -> Result<(), slint::PlatformError> {
     let ui = AppWindow::new()?;
@@ -32,6 +83,13 @@ fn main() -> Result<(), slint::PlatformError> {
         .collect();
 
     ui.set_results(std::rc::Rc::new(slint::VecModel::from(results)).into());
+
+    let weak = ui.as_weak();
+    slint::Timer::single_shot(Duration::from_millis(50), move || {
+        if let Some(ui) = weak.upgrade() {
+            apply_blur(&ui);
+        }
+    });
 
     ui.run()
 }
