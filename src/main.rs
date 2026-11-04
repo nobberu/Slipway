@@ -1,22 +1,192 @@
+// Copyright (C) 2026 nobberu <itsnobberu@gmail.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+use std::collections::HashSet;
 use std::ffi::c_void;
 use std::time::Duration;
 
+#[cfg(target_os = "windows")]
+use windows::{
+    Win32::System::Com::{
+        COINIT_APARTMENTTHREADED, CoInitializeEx, CoTaskMemFree, CoUninitialize, IBindCtx,
+    },
+    Win32::UI::Shell::{
+        BHID_EnumItems, IEnumShellItems, IShellItem, SHCreateItemFromParsingName, SIGDN,
+        SIGDN_DESKTOPABSOLUTEPARSING, SIGDN_NORMALDISPLAY,
+    },
+    core::HSTRING,
+};
+
 slint::include_modules!();
 
-const CATALOG: &[(&str, &str, &str)] = &[
-    ("App 1", "Windows", "Application"),
-    ("App 2", "Windows", "Application"),
-    ("App 3", "Windows", "Application"),
-    ("App 4", "Windows", "Application"),
-    ("App 5", "Windows", "Application"),
-    ("Command 1", "System Actions", "Command"),
-    ("Command 2", "System Actions", "Command"),
-    ("Command 3", "System Actions", "Command"),
-    ("Command 4", "System Actions", "Command"),
-    ("Command 4", "System Actions", "Command"),
-    ("Command 4", "System Actions", "Command"),
-    ("Command 4", "System Actions", "Command"),
+const COMMANDS: &[&str] = &[
+    "Lock Screen",
+    "Sleep",
+    "Restart",
+    "Shut Down",
+    "Clipboard",
+    "Confetti",
 ];
+
+struct AppEntry {
+    name: String,
+    subtitle: String,
+    kind: &'static str,
+}
+
+fn classify(app_id: &str) -> (&'static str, &'static str) {
+    let id = app_id.to_lowercase();
+    let launchers = [
+        ("steam://", "Steam"),
+        ("com.epicgames.launcher://", "Epic Games"),
+        ("uplay://", "Ubisoft Connect"),
+        ("goggalaxy://", "GOG Galaxy"),
+        ("battlenet://", "Battle.net"),
+        ("origin://", "EA"),
+        ("origin2://", "EA"),
+    ];
+    for (needle, name) in launchers {
+        if id.contains(needle) {
+            return ("Game", name);
+        }
+    }
+    ("Application", "Windows")
+}
+
+#[cfg(target_os = "windows")]
+struct ComGuard;
+
+#[cfg(target_os = "windows")]
+impl ComGuard {
+    fn new() -> Self {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        }
+        ComGuard
+    }
+}
+
+#[cfg(target_os = "windows")]
+impl Drop for ComGuard {
+    fn drop(&mut self) {
+        unsafe {
+            CoUninitialize();
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn item_name(item: &IShellItem, kind: SIGDN) -> Option<String> {
+    unsafe {
+        let p = item.GetDisplayName(kind).ok()?;
+        let s = p.to_string().ok();
+        CoTaskMemFree(Some(p.0 as *const c_void));
+        s
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn scan_apps() -> windows::core::Result<Vec<AppEntry>> {
+    let _com = ComGuard::new();
+
+    unsafe {
+        let folder: IShellItem =
+            SHCreateItemFromParsingName(&HSTRING::from("shell:AppsFolder"), None::<&IBindCtx>)?;
+        let items: IEnumShellItems = folder.BindToHandler(None::<&IBindCtx>, &BHID_EnumItems)?;
+
+        let mut seen = HashSet::new();
+        let mut apps = Vec::new();
+
+        loop {
+            let mut batch: [Option<IShellItem>; 1] = [None];
+            let mut fetched = 0u32;
+            if items.Next(&mut batch, Some(&mut fetched)).is_err() || fetched == 0 {
+                break;
+            }
+            let Some(item) = batch[0].take() else {
+                break;
+            };
+
+            let Some(name) = item_name(&item, SIGDN_NORMALDISPLAY) else {
+                continue;
+            };
+            let Some(parsing) = item_name(&item, SIGDN_DESKTOPABSOLUTEPARSING) else {
+                continue;
+            };
+
+            let name = name.trim();
+            if name.is_empty()
+                || name.to_lowercase().contains("uninstall")
+                || !seen.insert(name.to_lowercase())
+            {
+                continue;
+            }
+
+            let (kind, subtitle) = classify(&parsing);
+            apps.push(AppEntry {
+                name: name.to_string(),
+                subtitle: subtitle.to_string(),
+                kind,
+            });
+        }
+
+        apps.sort_by_key(|a| a.name.to_lowercase());
+        Ok(apps)
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn load_apps() -> Vec<AppEntry> {
+    scan_apps().unwrap()
+}
+
+fn header(title: &str) -> ResultItem {
+    ResultItem {
+        title: title.into(),
+        subtitle: "".into(),
+        kind: "".into(),
+        initial: "".into(),
+        is_header: true,
+    }
+}
+
+fn row(title: &str, subtitle: &str, kind: &str) -> ResultItem {
+    ResultItem {
+        title: title.into(),
+        subtitle: subtitle.into(),
+        kind: kind.into(),
+        initial: title
+            .chars()
+            .next()
+            .unwrap_or('?')
+            .to_uppercase()
+            .to_string()
+            .into(),
+        is_header: false,
+    }
+}
+
+fn build_results(apps: &[AppEntry]) -> Vec<ResultItem> {
+    let mut results: Vec<ResultItem> = Vec::new();
+
+    for (kind, title) in [("Application", "Applications"), ("Game", "Games")] {
+        let group: Vec<&AppEntry> = apps.iter().filter(|a| a.kind == kind).collect();
+        if group.is_empty() {
+            continue;
+        }
+        results.push(header(title));
+        for a in group {
+            results.push(row(&a.name, &a.subtitle, a.kind));
+        }
+    }
+
+    results.push(header("Commands"));
+    for name in COMMANDS {
+        results.push(row(name, "System Actions", "Command"));
+    }
+
+    results
+}
 
 #[cfg(target_os = "windows")]
 #[link(name = "dwmapi")]
@@ -66,38 +236,32 @@ fn apply_blur(ui: &AppWindow) {
 fn main() -> Result<(), slint::PlatformError> {
     let ui = AppWindow::new()?;
 
-    let mut results: Vec<ResultItem> = Vec::new();
-    let mut current_kind: Option<&str> = None;
+    ui.set_results(std::rc::Rc::new(slint::VecModel::from(build_results(&[]))).into());
+    ui.set_selected(1);
 
-    for (title, subtitle, kind) in CATALOG {
-        if current_kind != Some(*kind) {
-            current_kind = Some(*kind);
-            results.push(ResultItem {
-                title: format!("{kind}s").into(),
-                subtitle: "".into(),
-                kind: "".into(),
-                initial: "".into(),
-                is_header: true,
+    {
+        let weak = ui.as_weak();
+        std::thread::spawn(move || {
+            let started = std::time::Instant::now();
+            let apps = load_apps();
+            let games = apps.iter().filter(|a| a.kind == "Game").count();
+            println!(
+                "found {} apps ({} games) in {:?}",
+                apps.len(),
+                games,
+                started.elapsed()
+            );
+
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = weak.upgrade() {
+                    ui.set_results(
+                        std::rc::Rc::new(slint::VecModel::from(build_results(&apps))).into(),
+                    );
+                    ui.set_selected(1);
+                }
             });
-        }
-
-        results.push(ResultItem {
-            title: (*title).into(),
-            subtitle: (*subtitle).into(),
-            kind: (*kind).into(),
-            initial: title
-                .chars()
-                .next()
-                .unwrap_or('?')
-                .to_uppercase()
-                .to_string()
-                .into(),
-            is_header: false,
         });
     }
-
-    ui.set_results(std::rc::Rc::new(slint::VecModel::from(results)).into());
-    ui.set_selected(1);
 
     let weak = ui.as_weak();
     slint::Timer::single_shot(Duration::from_millis(50), move || {
