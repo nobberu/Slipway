@@ -22,7 +22,9 @@ slint::include_modules!();
 const COMMANDS: &[&str] = &[
     "Lock Screen",
     "Sleep",
+    "Restart Without Update",
     "Restart",
+    "Shut Down Without Update",
     "Shut Down",
     "Clipboard",
     "Confetti",

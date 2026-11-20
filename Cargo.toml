@@ -24,6 +24,7 @@ windows = { version = "0.58", features = [
 slint-build = { version = "1.18.1", default-features = false, features = [
   "compat-1-18",
 ] }
+winres = "0.1"
 
 [profile.dev]
 opt-level = "s"
